@@ -1,0 +1,3 @@
+package com.bcsystems.siga.controller;
+import com.bcsystems.siga.domain.*; import com.bcsystems.siga.dto.*; import com.bcsystems.siga.service.NominaService; import org.springframework.security.access.prepost.PreAuthorize; import org.springframework.web.bind.annotation.*; import java.util.*;
+@RestController @RequestMapping("/api/v1/comision") public class ComisionController {private final NominaService s; public ComisionController(NominaService s){this.s=s;} @GetMapping @PreAuthorize("hasAuthority('COMISIONES_VER')") public List<Comision> listar(){return s.listarComisiones();} @PostMapping @PreAuthorize("hasAuthority('COMISIONES_CREAR')") public Comision crear(@RequestBody ComisionRequest r){return s.crearComision(r);}}

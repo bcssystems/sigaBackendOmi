@@ -1,0 +1,3 @@
+package com.bcsystems.siga.dto;
+import com.bcsystems.siga.domain.Nomina; import com.bcsystems.siga.domain.en.EstadoNomina; import java.math.BigDecimal; import java.time.LocalDate;
+public record NominaResponse(Long id,Integer personaId,String personaNombre,LocalDate fechaNomina,LocalDate fechaInicio,LocalDate fechaFin,BigDecimal sueldoBase,BigDecimal totalComisiones,BigDecimal totalDeducciones,BigDecimal sueldo,EstadoNomina estado){ public static NominaResponse of(Nomina n){return new NominaResponse(n.getIdNomina(),n.getPersona().getIdPersona(),n.getPersona().getNombre()+" "+n.getPersona().getApellido(),n.getFechaNomina(),n.getFechaInicio(),n.getFechaFin(),n.getSueldoBase(),n.getTotalComisiones(),n.getTotalDeducciones(),n.getSueldo(),n.getEstado());}}

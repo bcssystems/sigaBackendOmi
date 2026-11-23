@@ -1,0 +1,3 @@
+package com.bcsystems.siga.controller;
+import com.bcsystems.siga.domain.*; import com.bcsystems.siga.dto.*; import com.bcsystems.siga.service.NominaService; import org.springframework.security.access.prepost.PreAuthorize; import org.springframework.web.bind.annotation.*; import java.util.*;
+@RestController @RequestMapping("/api/v1/prestamos") public class PrestamoController {private final NominaService s; public PrestamoController(NominaService s){this.s=s;} @GetMapping @PreAuthorize("hasAuthority('PRESTAMOS_VER')") public List<PrestamoEmpleado> listar(){return s.listarPrestamos();} @PostMapping @PreAuthorize("hasAuthority('PRESTAMOS_CREAR')") public PrestamoEmpleado crear(@RequestBody PrestamoRequest r){return s.crearPrestamo(r);}}
