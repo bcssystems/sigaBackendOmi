@@ -4,7 +4,7 @@ import jakarta.persistence.*; import lombok.*; import java.math.BigDecimal; impo
 public class DeduccionFija {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long idDeduccionFija;
  @Column(nullable=false) private String concepto; @Column(nullable=false,precision=12,scale=2) private BigDecimal monto;
- @Column(nullable=false) private Boolean activo; @Column(nullable=false) private LocalDate fechaInicio; private LocalDate fechaFin;
+  @Column(nullable=false) private Boolean activo; private LocalDate fechaInicio; private LocalDate fechaFin;
  @ManyToMany @JoinTable(name="deduccion_fija_persona",joinColumns=@JoinColumn(name="deduccion_fija_id"),inverseJoinColumns=@JoinColumn(name="persona_id"))
  @Builder.Default private Set<Persona> personas=new HashSet<>();
 }
