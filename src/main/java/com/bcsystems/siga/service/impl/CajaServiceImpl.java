@@ -61,8 +61,6 @@ public class CajaServiceImpl implements CajaService {
                 .orElseThrow(() -> new NotFoundException("Sucursal no encontrada"));
 
         TipoCaja tipo = request.tipo() != null ? TipoCaja.valueOf(request.tipo()) : TipoCaja.NORMAL;
-        validarCajaUnica(sucursal, tipo, null);
-
         Caja caja = Caja.builder()
                 .nombre(request.nombre())
                 .tipo(tipo)
@@ -87,7 +85,6 @@ public class CajaServiceImpl implements CajaService {
         Sucursal sucursal = sucursalRepository.findById(request.idSucursal())
                 .orElseThrow(() -> new NotFoundException("Sucursal no encontrada"));
         TipoCaja tipo = request.tipo() != null ? TipoCaja.valueOf(request.tipo()) : TipoCaja.NORMAL;
-        validarCajaUnica(sucursal, tipo, id);
         caja.setNombre(request.nombre());
         caja.setSucursal(sucursal);
         caja.setTipo(tipo);
@@ -498,16 +495,6 @@ public class CajaServiceImpl implements CajaService {
     private void validarCajaAbierta(Caja caja) {
         if (caja.getEstado() != CajaEstado.ABIERTA) {
             throw new InvalidEntryException("La caja debe estar abierta para realizar esta operación");
-        }
-    }
-
-    private void validarCajaUnica(Sucursal sucursal, TipoCaja tipo, Integer idExcluir) {
-        boolean existe = cajaRepository.findBySucursalIdSucursalAndActivaTrue(sucursal.getIdSucursal()).stream()
-                .anyMatch(c -> c.getTipo() == tipo
-                        && (idExcluir == null || !c.getIdCaja().equals(idExcluir)));
-        if (existe) {
-            throw new InvalidEntryException("Ya existe una caja " + tipo.name().toLowerCase()
-                    + " activa en la sucursal " + sucursal.getNombre());
         }
     }
 
