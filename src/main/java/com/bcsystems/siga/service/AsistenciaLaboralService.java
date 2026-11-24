@@ -52,7 +52,6 @@ public class AsistenciaLaboralService {
             double d=distance(lat.doubleValue(),lon.doubleValue(),branch.getLatitud().doubleValue(),branch.getLongitud().doubleValue());
             if(d<distance){distance=d;closest=branch;}
         }
-        if (closest == null) throw new IllegalArgumentException("No hay sucursales activas con ubicación configurada");
         boolean inside=closest!=null && distance<=intConfig("asistenciaRadioMaximo",100);
         Marcaje mark=marcajes.save(Marcaje.builder().asistencia(attendance).tipo(tipo).marcadoEn(now).latitud(lat).longitud(lon).precisionMetros(precision).distanciaMetros(closest==null?null:distance).estadoUbicacion(inside?EstadoAsistencia.APROBADA:EstadoAsistencia.PENDIENTE).sucursal(closest).build());
         if(selfie!=null&&!selfie.isEmpty()) guardarEvidencia(selfie,mark,now);
