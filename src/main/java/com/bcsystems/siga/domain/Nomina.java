@@ -11,6 +11,7 @@ import java.time.LocalDate;
 public class Nomina {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long idNomina;
     @ManyToOne(fetch=FetchType.LAZY, optional=false) @JoinColumn(name="id_persona", nullable=false) private Persona persona;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="lote_id") private NominaLote lote;
     @Column(nullable=false) private LocalDate fechaNomina;
     @Column(nullable=false) private LocalDate fechaInicio;
     @Column(nullable=false) private LocalDate fechaFin;
