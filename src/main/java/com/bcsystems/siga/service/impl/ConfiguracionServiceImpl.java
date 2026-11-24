@@ -42,7 +42,7 @@ public class ConfiguracionServiceImpl implements ConfiguracionService {
     );
 
     private static final Map<String, String> DESCRIPCIONES = Map.ofEntries(
-            Map.entry("fondoCajaChica", "Monto inicial de la caja chica al abrirla"),
+            Map.entry("fondoCajaChica", "Monto inicial recomendado para abrir cualquier caja"),
             Map.entry("tasaInteresMoraPagare", "Tasa de interes mensual de mora que se imprime en el pagare"),
             Map.entry("diasListaNegra", "Dias sin abonar para pasar automaticamente a lista negra"),
             Map.entry("titularPagare", "Nombre del titular que se imprime en el pagare"),
