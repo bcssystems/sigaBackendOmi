@@ -64,6 +64,14 @@ public class HorarioLaboralService {
         Persona persona = personas.findByUsuarioIgnoreCase(username).orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
         return asignado(persona.getIdPersona());
     }
+    public void recalcularAsignado(Persona persona) {
+        UsuarioHorario assignment = asignaciones.findFirstByPersonaIdPersonaAndActivoTrueOrderByIdUsuarioHorarioDesc(persona.getIdPersona()).orElse(null);
+        if (assignment == null) {
+            persona.setSueldoHora(BigDecimal.ZERO);
+            return;
+        }
+        recalcular(persona, assignment.getHorario());
+    }
     public BigDecimal horasSemanales(Horario h) { return BigDecimal.valueOf(h.getDias().stream().mapToLong(d -> {
         long total = Duration.between(d.getEntrada(), d.getSalida()).toMinutes();
         return total - d.getBreaks().stream().mapToLong(b -> Duration.between(b.getInicio(), b.getFin()).toMinutes()).sum();

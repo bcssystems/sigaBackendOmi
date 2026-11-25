@@ -13,7 +13,6 @@ public record PersonaResponse(
     Boolean activa,
     LocalDateTime fechaRegistro,
     List<Integer> permisosAdicionales,
-    BigDecimal sueldoBase,
     BigDecimal sueldoSemanal,
     BigDecimal sueldoHora
 ) {}

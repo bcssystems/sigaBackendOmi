@@ -16,6 +16,7 @@ import com.bcsystems.siga.repository.PermisoRepository;
 import com.bcsystems.siga.repository.PersonaRepository;
 import com.bcsystems.siga.repository.RolRepository;
 import com.bcsystems.siga.service.AuditoriaService;
+import com.bcsystems.siga.service.HorarioLaboralService;
 import com.bcsystems.siga.service.PersonaService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,8 +26,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,6 +43,7 @@ public class PersonaServiceImpl implements PersonaService {
     private final PermisoRepository permisoRepository;
     private final PermisoAdicionalRepository permisoAdicionalRepository;
     private final TokenRepository tokenRepository;
+    private final HorarioLaboralService horarioLaboralService;
 
     public PersonaServiceImpl(PersonaRepository personaRepository,
                                PasswordEncoder passwordEncoder,
@@ -46,7 +51,8 @@ public class PersonaServiceImpl implements PersonaService {
                                RolRepository rolRepository,
                                PermisoRepository permisoRepository,
                                PermisoAdicionalRepository permisoAdicionalRepository,
-                               TokenRepository tokenRepository) {
+                               TokenRepository tokenRepository,
+                               HorarioLaboralService horarioLaboralService) {
         this.personaRepository = personaRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditoriaService = auditoriaService;
@@ -54,6 +60,7 @@ public class PersonaServiceImpl implements PersonaService {
         this.permisoRepository = permisoRepository;
         this.permisoAdicionalRepository = permisoAdicionalRepository;
         this.tokenRepository = tokenRepository;
+        this.horarioLaboralService = horarioLaboralService;
     }
 
     @Override
@@ -78,9 +85,7 @@ public class PersonaServiceImpl implements PersonaService {
     @Transactional
     @Override
     public PersonaResponse crear(PersonaRequest request) {
-        if (personaRepository.existsByUsuarioIgnoreCase(request.usuario())) {
-            throw new InvalidEntryException("El usuario ya existe");
-        }
+        String usuario = usuarioDisponible(generarUsuario(request.nombre(), request.apellido()));
 
         Rol rol = rolRepository.findById(request.idRol())
                 .orElseThrow(() -> new InvalidEntryException("Rol no encontrado"));
@@ -92,13 +97,12 @@ public class PersonaServiceImpl implements PersonaService {
         Persona persona = Persona.builder()
                 .nombre(request.nombre())
                 .apellido(request.apellido())
-                .usuario(request.usuario())
+                .usuario(usuario)
                 .password(request.password() != null ? passwordEncoder.encode(request.password()) : null)
                 .rol(rol)
                 .activa(request.activa() != null ? request.activa() : true)
-                .sueldoBase(request.sueldoBase())
                 .sueldoSemanal(request.sueldoSemanal())
-                .sueldoHora(request.sueldoHora())
+                .sueldoHora(BigDecimal.ZERO)
                 .build();
 
         persona = personaRepository.save(persona);
@@ -107,8 +111,8 @@ public class PersonaServiceImpl implements PersonaService {
             guardarPermisosAdicionales(persona, request.permisosAdicionales());
         }
 
-        String usuario = obtenerUsuarioActual();
-        auditoriaService.registrar("PERSONA", persona.getIdPersona(), AccionAuditoria.CREACION.name(), usuario,
+        String usuarioActual = obtenerUsuarioActual();
+        auditoriaService.registrar("PERSONA", persona.getIdPersona(), AccionAuditoria.CREACION.name(), usuarioActual,
                 "Se creó el usuario: " + persona.getUsuario());
 
         return toResponse(persona);
@@ -120,7 +124,8 @@ public class PersonaServiceImpl implements PersonaService {
         Persona persona = personaRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Persona no encontrada con id: " + id));
 
-        if (personaRepository.existsByUsuarioIgnoreCaseAndIdPersonaNot(request.usuario(), id)) {
+        String usuario = request.usuario() == null || request.usuario().isBlank() ? persona.getUsuario() : request.usuario().trim();
+        if (personaRepository.existsByUsuarioIgnoreCaseAndIdPersonaNot(usuario, id)) {
             throw new InvalidEntryException("El usuario ya está en uso");
         }
 
@@ -131,22 +136,21 @@ public class PersonaServiceImpl implements PersonaService {
             throw new InvalidEntryException("El rol seleccionado está inactivo");
         }
 
-        boolean securityChanged = !persona.getUsuario().equalsIgnoreCase(request.usuario())
+        boolean securityChanged = !persona.getUsuario().equalsIgnoreCase(usuario)
                 || !persona.getRol().getIdRol().equals(request.idRol())
                 || (request.activa() != null && !request.activa().equals(persona.getActiva()))
                 || (request.password() != null && !request.password().isBlank());
 
         persona.setNombre(request.nombre());
         persona.setApellido(request.apellido());
-        persona.setUsuario(request.usuario());
+        persona.setUsuario(usuario);
         persona.setRol(rol);
         if (request.password() != null && !request.password().isBlank()) {
             persona.setPassword(passwordEncoder.encode(request.password()));
         }
         if (request.activa() != null) persona.setActiva(request.activa());
-        if (request.sueldoBase() != null) persona.setSueldoBase(request.sueldoBase());
         if (request.sueldoSemanal() != null) persona.setSueldoSemanal(request.sueldoSemanal());
-        if (request.sueldoHora() != null) persona.setSueldoHora(request.sueldoHora());
+        horarioLaboralService.recalcularAsignado(persona);
 
         personaRepository.save(persona);
         if (securityChanged) tokenRepository.revokeAllByPersonaId(persona.getIdPersona());
@@ -156,8 +160,8 @@ public class PersonaServiceImpl implements PersonaService {
             guardarPermisosAdicionales(persona, request.permisosAdicionales());
         }
 
-        String usuario = obtenerUsuarioActual();
-        auditoriaService.registrar("PERSONA", id, AccionAuditoria.ACTUALIZACION.name(), usuario,
+        String usuarioActual = obtenerUsuarioActual();
+        auditoriaService.registrar("PERSONA", id, AccionAuditoria.ACTUALIZACION.name(), usuarioActual,
                 "Se actualizó el usuario: " + persona.getUsuario());
 
         return toResponse(persona);
@@ -214,7 +218,36 @@ public class PersonaServiceImpl implements PersonaService {
         }
 
         return new PersonaResponse(p.getIdPersona(), p.getNombre(), p.getApellido(),
-                p.getUsuario(), rolResponse, p.getActiva(), p.getFechaRegistro(), permisosAdicionales,
-                p.getSueldoBase(), p.getSueldoSemanal(), p.getSueldoHora());
+                 p.getUsuario(), rolResponse, p.getActiva(), p.getFechaRegistro(), permisosAdicionales,
+                p.getSueldoSemanal(), p.getSueldoHora());
+    }
+
+    private String generarUsuario(String nombre, String apellido) {
+        String primerNombre = normalizarUsuario(primerToken(nombre));
+        String primerApellido = normalizarUsuario(primerToken(apellido));
+        if (primerNombre.isBlank() || primerApellido.isBlank()) {
+            throw new InvalidEntryException("No se pudo generar el usuario con el nombre y apellido proporcionados");
+        }
+        return primerNombre.substring(0, 1) + primerApellido;
+    }
+
+    private String usuarioDisponible(String base) {
+        String usuario = base;
+        int consecutivo = 2;
+        while (personaRepository.existsByUsuarioIgnoreCase(usuario)) {
+            usuario = base + consecutivo++;
+        }
+        return usuario;
+    }
+
+    private String primerToken(String value) {
+        return value == null ? "" : value.trim().split("\\s+")[0];
+    }
+
+    private String normalizarUsuario(String value) {
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^a-zA-Z0-9]", "")
+                .toLowerCase(Locale.ROOT);
     }
 }

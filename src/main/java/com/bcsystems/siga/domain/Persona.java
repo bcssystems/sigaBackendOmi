@@ -50,9 +50,6 @@ public class Persona {
     private String password;
 
     @Column(precision = 12, scale = 2)
-    private BigDecimal sueldoBase;
-
-    @Column(precision = 12, scale = 2)
     private BigDecimal sueldoSemanal;
 
     @Column(precision = 12, scale = 2)

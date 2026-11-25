@@ -4,6 +4,7 @@ import com.bcsystems.siga.domain.*;
 import com.bcsystems.siga.domain.en.*;
 import com.bcsystems.siga.repository.ComisionRepository;
 import com.bcsystems.siga.repository.VentaRepository;
+import com.bcsystems.siga.repository.VentaDetalleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.util.*;
 public class ComisionVentaService {
     private final ComisionRepository comisionRepository;
     private final VentaRepository ventaRepository;
+    private final VentaDetalleRepository ventaDetalleRepository;
     private final ConfiguracionService configuracionService;
 
     @Transactional
@@ -34,10 +36,12 @@ public class ComisionVentaService {
             Persona persona = venta.getUsuario();
             if (persona == null || persona.getRol() == null || !roles.contains(persona.getRol().getIdRol())) continue;
             if (comisionRepository.existsByVentaIdVenta(venta.getIdVenta())) continue;
-            BigDecimal base = BigDecimal.valueOf(venta.getTotal()).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal base = calcularUtilidad(venta);
+            // Una venta sin utilidad no genera comisión.
+            if (base.signum() <= 0) continue;
             BigDecimal monto = base.multiply(porcentaje).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             comisionRepository.save(Comision.builder()
-                    .persona(persona).venta(venta).concepto("Comisión por venta #" + venta.getIdVenta())
+                    .persona(persona).venta(venta).concepto("Comisión por utilidad de venta #" + venta.getIdVenta())
                     .tipoComision(TipoComision.VENTA).montoBase(base).porcentajeComision(porcentaje)
                     .montoComision(monto).estadoComision(EstadoComision.PENDIENTE)
                     .fechaComision(corte.getFechaCierre() == null ? LocalDate.now() : corte.getFechaCierre().toLocalDate())
@@ -45,6 +49,38 @@ public class ComisionVentaService {
             creadas++;
         }
         return creadas;
+    }
+
+    /**
+     * La base de comisión es la utilidad real: total cobrado al cliente menos
+     * el costo total de los productos vendidos. Usar venta.total aquí incluye
+     * descuentos ya aplicados al cliente.
+     */
+    private BigDecimal calcularUtilidad(Venta venta) {
+        BigDecimal totalCobrado = decimal(venta.getTotal());
+        BigDecimal costoTotal = ventaDetalleRepository.findByVentaIdVenta(venta.getIdVenta()).stream()
+                .map(this::costoDetalle)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return totalCobrado.subtract(costoTotal).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal costoDetalle(VentaDetalle detalle) {
+        BigDecimal costoUnitario = detalle.getCostoUnitario();
+        // Los detalles históricos todavía no tienen costo_unitario; para ellos
+        // se conserva compatibilidad usando el costo actual del producto.
+        if (costoUnitario == null && detalle.getProducto() != null) {
+            costoUnitario = decimal(detalle.getProducto().getCostoPromedio());
+        }
+        BigDecimal cantidad = detalle.getCantidad() == null ? BigDecimal.ZERO : detalle.getCantidad();
+        return noNegativo(costoUnitario).multiply(noNegativo(cantidad));
+    }
+
+    private BigDecimal decimal(Double value) {
+        return value == null || !Double.isFinite(value) ? BigDecimal.ZERO : BigDecimal.valueOf(value);
+    }
+
+    private BigDecimal noNegativo(BigDecimal value) {
+        return value == null || value.signum() < 0 ? BigDecimal.ZERO : value;
     }
 
     @Transactional

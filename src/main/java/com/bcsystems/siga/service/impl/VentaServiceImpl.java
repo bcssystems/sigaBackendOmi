@@ -95,14 +95,16 @@ public class VentaServiceImpl implements VentaService {
         List<VentaDetalle> detalles = new ArrayList<>();
         double subtotalEfectivo = 0.0;
         for (VentaDetalleRequest dto : request.detalles()) {
+            Producto producto = dto.idProducto() != null && dto.idProducto() > 0
+                    ? productoRepository.findById(dto.idProducto()).orElse(null) : null;
             VentaDetalle detalle = VentaDetalle.builder()
                     .venta(venta)
-                    .producto(dto.idProducto() != null
-                            ? productoRepository.findById(dto.idProducto()).orElse(null) : null)
+                    .producto(producto)
                     .descripcion(dto.descripcion())
                     .cantidad(dto.cantidad())
                     .precioUnitario(dto.precioUnitario())
                     .subtotal(dto.subtotal())
+                    .costoUnitario(obtenerCostoUnitario(dto, producto))
                     .atributosText(dto.atributosText())
                     .build();
 
@@ -522,14 +524,16 @@ public class VentaServiceImpl implements VentaService {
 
         List<VentaDetalle> nuevos = new ArrayList<>();
         for (VentaDetalleRequest dto : request.detalles()) {
+            Producto producto = dto.idProducto() != null && dto.idProducto() > 0
+                    ? productoRepository.findById(dto.idProducto()).orElse(null) : null;
             VentaDetalle detalle = VentaDetalle.builder()
                     .venta(venta)
-                    .producto(dto.idProducto() != null
-                            ? productoRepository.findById(dto.idProducto()).orElse(null) : null)
+                    .producto(producto)
                     .descripcion(dto.descripcion())
                     .cantidad(dto.cantidad())
                     .precioUnitario(dto.precioUnitario())
                     .subtotal(dto.subtotal())
+                    .costoUnitario(obtenerCostoUnitario(dto, producto))
                     .atributosText(dto.atributosText())
                     .build();
             validarCantidadProducto(detalle.getProducto(), dto.cantidad());
@@ -781,6 +785,7 @@ public class VentaServiceImpl implements VentaService {
                 .cantidad(cantidad)
                 .precioUnitario(precioVenta)
                 .subtotal(subtotal)
+                .costoUnitario(normalizarCosto(precioCompra))
                 .build();
         ventaDetalleRepository.save(detalle);
 
@@ -788,6 +793,26 @@ public class VentaServiceImpl implements VentaService {
         cajaRepository.save(caja);
 
         return toResponse(venta, List.of(detalle));
+    }
+
+    private java.math.BigDecimal obtenerCostoUnitario(VentaDetalleRequest dto, Producto producto) {
+        if (producto != null) return normalizarCosto(producto.getCostoPromedio());
+
+        // Los IDs negativos representan artículos de venta rápida. El costo
+        // se obtiene del carrito en el servidor, sin confiar en el navegador.
+        if (dto.idProducto() != null && dto.idProducto() < 0) {
+            return carritoItemRapidoRepository.findById(-dto.idProducto())
+                    .map(item -> normalizarCosto(item.getPrecioCompra()))
+                    .orElse(java.math.BigDecimal.ZERO);
+        }
+        return java.math.BigDecimal.ZERO;
+    }
+
+    private java.math.BigDecimal normalizarCosto(Double costo) {
+        if (costo == null || !Double.isFinite(costo) || costo < 0) {
+            return java.math.BigDecimal.ZERO;
+        }
+        return java.math.BigDecimal.valueOf(costo).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private void validarCantidadProducto(Producto producto, java.math.BigDecimal cantidad) {

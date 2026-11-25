@@ -36,6 +36,14 @@ public class VentaDetalle {
     @Column(nullable = false)
     private Double subtotal;
 
+    /**
+     * Costo unitario utilizado para conservar la utilidad de la venta.
+     * Para productos normales se toma de costoPromedio y para ventas rápidas
+     * del precio de compra capturado en el carrito.
+     */
+    @Column(name = "costo_unitario", precision = 19, scale = 2)
+    private java.math.BigDecimal costoUnitario;
+
     @Column(columnDefinition = "TEXT")
     private String atributosText;
 }
