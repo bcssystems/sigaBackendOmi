@@ -17,6 +17,13 @@ import java.util.stream.Collectors;
 
 @Component
 public class DataSeedRunner implements CommandLineRunner {
+    private static final Set<String> MAKER_USUARIO_PERMISSIONS = Set.of(
+            "MAKER_VER",
+            "MAKER_COTIZACION_CREAR", "MAKER_COTIZACION_EDITAR",
+            "MAKER_PROYECTO_CREAR", "MAKER_PROYECTO_EDITAR",
+            "MAKER_TAREA_CREAR", "MAKER_TAREA_EDITAR",
+            "MAKER_STOCK_VER", "MAKER_STOCK_MOVIMIENTO",
+            "MAKER_NOTIFICACIONES_VER", "MAKER_NOTIFICACIONES_EDITAR");
 
     private final PermisoRepository permisoRepository;
     private final RolRepository rolRepository;
@@ -76,7 +83,7 @@ public class DataSeedRunner implements CommandLineRunner {
         Set<Permiso> todosLosPermisos = new HashSet<>(permisoMap.values());
 
         reasignarPermisosExistentes(rolRepository.findAll(),
-                nuevosPermisos, todosLosPermisos);
+                nuevosPermisos, todosLosPermisos, permisoMap);
 
         Map<String, Set<Permiso>> permisosPorRol = new LinkedHashMap<>();
         permisosPorRol.put("ADMINISTRADOR", todosLosPermisos);
@@ -100,8 +107,14 @@ public class DataSeedRunner implements CommandLineRunner {
                 "MOVIMIENTOS_INVENTARIO_VER",
                 "CAJA_CHICA_VER", "CAJA_CHICA_CREAR",
                 "CANCELACIONES_VER",
-                "PROMOCIONES_VER",
-                "CONFIGURACION_VER")));
+                 "PROMOCIONES_VER",
+                 "CONFIGURACION_VER",
+                 "MAKER_VER",
+                 "MAKER_COTIZACION_CREAR", "MAKER_COTIZACION_EDITAR",
+                 "MAKER_PROYECTO_CREAR", "MAKER_PROYECTO_EDITAR",
+                 "MAKER_TAREA_CREAR", "MAKER_TAREA_EDITAR",
+                 "MAKER_STOCK_VER", "MAKER_STOCK_MOVIMIENTO",
+                 "MAKER_NOTIFICACIONES_VER", "MAKER_NOTIFICACIONES_EDITAR")));
 
         for (var entry : permisosPorRol.entrySet()) {
             String nombre = entry.getKey();
@@ -122,7 +135,8 @@ public class DataSeedRunner implements CommandLineRunner {
 
     private void reasignarPermisosExistentes(List<Rol> rolesExistentes,
                                              List<Permiso> nuevosPermisos,
-                                             Set<Permiso> todosLosPermisos) {
+                                             Set<Permiso> todosLosPermisos,
+                                             Map<String, Permiso> permisoMap) {
         if (rolesExistentes == null || rolesExistentes.isEmpty()) return;
         for (Rol rol : rolesExistentes) {
             boolean esAdmin = rol.getNombre().equalsIgnoreCase("ADMINISTRADOR")
@@ -139,9 +153,26 @@ public class DataSeedRunner implements CommandLineRunner {
                 cambio = true;
             } else {
                 for (Permiso p : nuevosPermisos) {
+                    // Los permisos Maker se asignan de forma granular abajo;
+                    // no deben terminar automáticamente en cada rol existente.
+                    if (esPermisoMaker(p)) continue;
                     if (!permisosRol.contains(p)) {
                         permisosRol.add(p);
                         cambio = true;
+                    }
+                }
+                if (Boolean.TRUE.equals(rol.getEsSistema())) {
+                    Set<String> makerObjetivo = rol.getNombre().equalsIgnoreCase("USUARIO")
+                            ? MAKER_USUARIO_PERMISSIONS : Set.of();
+                    if (permisosRol.removeIf(this::esPermisoMaker)) {
+                        cambio = true;
+                    }
+                    for (String clave : makerObjetivo) {
+                        Permiso permiso = permisoMap.get(clave);
+                        if (permiso != null && !permisosRol.contains(permiso)) {
+                            permisosRol.add(permiso);
+                            cambio = true;
+                        }
                     }
                 }
             }
@@ -150,6 +181,11 @@ public class DataSeedRunner implements CommandLineRunner {
                 rolRepository.save(rol);
             }
         }
+    }
+
+    private boolean esPermisoMaker(Permiso permiso) {
+        return permiso != null && ("MAKER".equalsIgnoreCase(permiso.getModulo())
+                || (permiso.getClave() != null && permiso.getClave().startsWith("MAKER_")));
     }
 
     private Set<Permiso> extraerPermisos(Map<String, List<String[]>> permisosPorModulo,
@@ -347,6 +383,27 @@ public class DataSeedRunner implements CommandLineRunner {
         map.put("CONFIGURACION", List.of(
                 new String[]{"CONFIGURACION_VER", "Ver Configuracion"},
                 new String[]{"CONFIGURACION_EDITAR", "Editar Configuracion"}
+        ));
+        map.put("MAKER", List.of(
+                new String[]{"MAKER_VER", "Ver módulo Maker"},
+                new String[]{"MAKER_COTIZACION_CREAR", "Crear cotizaciones Maker"},
+                new String[]{"MAKER_COTIZACION_EDITAR", "Editar cotizaciones Maker"},
+                new String[]{"MAKER_COTIZACION_ELIMINAR", "Eliminar cotizaciones Maker"},
+                new String[]{"MAKER_CATALOGO_CREAR", "Crear catálogo Maker"},
+                new String[]{"MAKER_CATALOGO_EDITAR", "Editar catálogo Maker"},
+                new String[]{"MAKER_CATALOGO_ELIMINAR", "Eliminar catálogo Maker"},
+                new String[]{"MAKER_CONFIGURACION_VER", "Ver configuración Maker"},
+                new String[]{"MAKER_CONFIGURACION_EDITAR", "Editar configuración Maker"},
+                new String[]{"MAKER_STOCK_VER", "Ver stock Maker"},
+                new String[]{"MAKER_STOCK_MOVIMIENTO", "Registrar movimientos de stock Maker"},
+                new String[]{"MAKER_PROYECTO_CREAR", "Crear proyectos Maker"},
+                new String[]{"MAKER_PROYECTO_EDITAR", "Editar proyectos Maker"},
+                new String[]{"MAKER_PROYECTO_ELIMINAR", "Eliminar proyectos Maker"},
+                new String[]{"MAKER_TAREA_CREAR", "Crear tareas Maker"},
+                new String[]{"MAKER_TAREA_EDITAR", "Editar tareas Maker"},
+                new String[]{"MAKER_TAREA_ELIMINAR", "Eliminar tareas Maker"},
+                new String[]{"MAKER_NOTIFICACIONES_VER", "Ver notificaciones Maker"},
+                new String[]{"MAKER_NOTIFICACIONES_EDITAR", "Marcar notificaciones Maker"}
         ));
         map.put("AUDITORIAS", List.<String[]>of(
                 new String[]{"AUDITORIAS_VER", "Ver Auditorias"}

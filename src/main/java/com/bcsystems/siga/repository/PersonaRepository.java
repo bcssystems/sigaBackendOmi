@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface PersonaRepository extends JpaRepository<Persona, Integer> {
@@ -15,6 +16,8 @@ public interface PersonaRepository extends JpaRepository<Persona, Integer> {
     Optional<Persona> findByUsuario(String usuario);
     boolean existsByUsuarioIgnoreCase(String usuario);
     boolean existsByUsuarioIgnoreCaseAndIdPersonaNot(String usuario, Integer idPersona);
+
+    List<Persona> findByActivaTrueOrderByUsuarioAsc();
 
     Page<Persona> findByActiva(Boolean activa, Pageable pageable);
 
